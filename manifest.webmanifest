@@ -1,0 +1,16 @@
+{
+  "name": "Scadenze",
+  "short_name": "Scadenze",
+  "description": "Scadenze di famiglia e business, solo sul tuo dispositivo",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2f2f7",
+  "theme_color": "#0a84ff",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
