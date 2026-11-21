@@ -1,6 +1,6 @@
 // Service worker: serve solo per far funzionare l'app offline.
 // Mette in cache SOLO i 4 file dell'app. Non tocca né invia i dati dell'utente.
-const C = 'scadenze-shell-v1';
+const C = 'scadenze-shell-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon.png'];
 
 self.addEventListener('install', e => {

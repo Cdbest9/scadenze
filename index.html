@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; frame-src blob:; object-src 'none'; worker-src 'self'; form-action 'none'; base-uri 'none'">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -138,12 +138,35 @@ h3.late{color:var(--rd)}
 .tg button{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:22px;background:var(--card2);font-weight:600;font-size:15px;border:2px solid transparent}
 .tg button.on{background:color-mix(in srgb,var(--c) 18%,transparent);border-color:var(--c)}
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translateX(-50%);background:rgba(30,30,34,.92);color:#fff;padding:11px 18px;border-radius:24px;font-size:15px;font-weight:600;z-index:99;animation:fade .2s;max-width:90%;text-align:center}
+
+.fld{position:relative}
+.clr{position:absolute;right:16px;top:10px;color:var(--ac);font-size:14px;font-weight:600;padding:2px}
+.search{width:100%;margin:16px 0 4px;padding:12px 16px;border-radius:14px;border:0;background:var(--card);box-shadow:var(--sh);font:inherit;font-size:17px;color:var(--tx);outline:0;-webkit-appearance:none}
+.frow{display:flex;align-items:center;border-bottom:1px solid var(--ln)}
+.frow .fv{flex:1;display:flex;align-items:center;gap:12px;padding:10px 14px;min-width:0}
+.frow .t{min-width:0;flex:1}.frow .t b{display:block;font-weight:600;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.frow .t small{color:var(--mu);font-size:12.5px}
+.th{width:46px;height:46px;border-radius:12px;background:var(--card2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.fx{padding:14px 18px;color:var(--mu);font-size:17px}
+.attbtns{display:flex;gap:8px;padding:12px 14px}
+.attbtns button{flex:1;text-align:center;padding:12px 6px;border-radius:14px;background:color-mix(in srgb,var(--ac) 12%,transparent);color:var(--ac);font-weight:600;font-size:15px}
+.viewer{position:fixed;inset:0;z-index:80;background:var(--bg);display:none;flex-direction:column}
+.vbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px}
+.vbar b{flex:1;text-align:center;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vbar button{color:var(--ac);font-weight:600;font-size:17px;padding:6px 2px}
+.vbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;align-items:center;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+.vbody img{max-width:100%;max-height:100%;object-fit:contain}
+.vbody iframe{width:100%;height:100%;border:0;background:#fff}
+.pill button{font-size:10.5px}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="sheetRoot"></div>
 <input type="file" id="imp" accept=".json,application/json" hidden>
+<input type="file" id="impics" accept=".ics,text/calendar" hidden>
+<input type="file" id="fcam" accept="image/*" capture="environment" hidden>
+<input type="file" id="ffile" multiple hidden>
+<div id="viewer" class="viewer"></div>
 <noscript>Per usare Scadenze serve JavaScript.</noscript>
 <script>
 (function(){
@@ -168,16 +191,18 @@ function $(s){return document.querySelector(s)}
 function defaults(){return{v:2,
  sections:[{id:'s1',name:'Io',kind:'persona',icon:'🙂',color:COLORS[0]},{id:'s2',name:'Famiglia',kind:'persona',icon:'🏠',color:COLORS[2]},{id:'b1',name:'La mia attività',kind:'business',icon:'🏢',color:COLORS[3]}],
  cats:[{id:'c1',name:'Assicurazioni',icon:'🛡️'},{id:'c2',name:'Visite mediche',icon:'🩺'},{id:'c3',name:'Finanziamenti',icon:'💶'},{id:'c4',name:'Documenti',icon:'📄'},{id:'c5',name:'Tasse e imposte',icon:'🧾'}],
- items:[]}}
+ items:[],docs:[],dtypes:DT()}}
+function DT(){return[{id:'t1',name:'Scontrino',icon:'🧾'},{id:'t2',name:'Garanzia',icon:'🛡️'},{id:'t3',name:'Dichiarazione fiscale',icon:'🏛️'},{id:'t4',name:'Fattura',icon:'📑'},{id:'t5',name:'Manuale',icon:'📘'},{id:'t6',name:'Altro',icon:'📎'}]}
 var storageOk=true,S;
-function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(valid(o))return o}}catch(e){storageOk=false}return defaults()}
+function load(){try{var r=localStorage.getItem(KEY);if(r){var o=JSON.parse(r);if(valid(o))return fix(o)}}catch(e){storageOk=false}return defaults()}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));storageOk=true}catch(e){storageOk=false;toast('⚠️ Impossibile salvare su questo dispositivo')}}
 function valid(o){return o&&Array.isArray(o.sections)&&Array.isArray(o.cats)&&Array.isArray(o.items)}
+function fix(o){o.docs=Array.isArray(o.docs)?o.docs:[];o.dtypes=(Array.isArray(o.dtypes)&&o.dtypes.length)?o.dtypes:DT();o.docs.forEach(function(d){d.files=d.files||[];d.secs=d.secs||[]});o.items.forEach(function(i){i.files=i.files||[]});return o}
 S=load();
 var persisted=null;
 try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().then(function(p){persisted=p;if(V.tab==='settings')render(true)})}}catch(e){}
 
-var V={tab:'home',kind:'all',sec:null,catf:'all',sheet:null,showDone:false};
+var V={tab:'home',kind:'all',sec:null,catf:'all',sheet:null,showDone:false,docq:'',dtf:'all',urls:[],usage:null,view:null};
 function sec(id){return S.sections.find(function(s){return s.id===id})}
 function cat(id){return S.cats.find(function(c){return c.id===id})}
 function toast(m){var t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(function(){t.remove()},2400)}
@@ -189,7 +214,7 @@ function label(it){
  if(d<0)return d===-1?'Scaduta ieri':'Scaduta da '+(-d)+' g';
  if(d===0)return'Oggi';if(d===1)return'Domani';if(d<=45)return'Tra '+d+' g';
  var m=Math.round(d/30.4);return m<24?'Tra '+m+' mesi':'Tra '+(d/365).toFixed(1).replace('.',',')+' anni'}
-function sorted(a){return a.slice().sort(function(x,y){return x.due.localeCompare(y.due)})}
+function sorted(a){return a.slice().sort(function(x,y){return x.due.localeCompare(y.due)||(x.start||'').localeCompare(y.start||'')})}
 function secsOf(it){return(it.secs||[]).map(sec).filter(Boolean)}
 function inKind(it,k){if(k==='all')return true;return secsOf(it).some(function(s){return s.kind===k})}
 var BK=[['late','Scadute'],['week','Questa settimana'],['month','Entro 30 giorni'],['later','Più avanti']];
@@ -199,8 +224,8 @@ function itemHTML(it){
  var ss=secsOf(it),c=cat(it.cat)||{icon:'📌',name:'Altro'},b=bucket(it);
  var color=col(ss[0]?ss[0].color:'#0a84ff');
  return '<button class="item'+(it.done?' isdone':'')+'" style="--c:'+color+'" data-act="edit" data-id="'+esc(it.id)+'">'+
- '<span class="ic">'+esc(c.icon)+'</span><span class="meta"><b>'+esc(it.title)+'</b><small>'+esc(c.name)+(ss.length?' · ':'')+ss.map(function(s){return '<span class="dot" style="--c:'+col(s.color)+'"></span>'+esc(s.name)}).join(' ')+'</small></span>'+
- '<span class="due"><em class="badge b-'+b+'">'+esc(label(it))+'</em><small>'+esc(fmt(it.due,true))+'</small></span></button>'}
+ '<span class="ic">'+esc(c.icon)+'</span><span class="meta"><b>'+esc(it.title)+'</b><small>'+esc(c.name)+(it.files&&it.files.length?' 📎'+it.files.length:'')+(ss.length?' · ':'')+ss.map(function(s){return '<span class="dot" style="--c:'+col(s.color)+'"></span>'+esc(s.name)}).join(' ')+'</small></span>'+
+ '<span class="due"><em class="badge b-'+b+'">'+esc(label(it))+'</em><small>'+esc(fmt(it.due,true))+(it.start?' · '+esc(it.start):'')+'</small></span></button>'}
 function groups(items){
  var h='',open=items.filter(function(i){return!i.done}),done=items.filter(function(i){return i.done});
  BK.forEach(function(k){var l=sorted(open.filter(function(i){return bucket(i)===k[0]}));
@@ -243,31 +268,109 @@ function secView(){
  h+=its.length?groups(its):emptyHTML('Nessuna scadenza','<br>in questa sezione.');
  return h+'</div>'}
 
-function settings(){
- var h='<div class="page"><p class="eyebrow">Personalizza</p><div class="top"><h1>Impostazioni</h1></div>'+
- '<div class="secure"><span class="e">🔒</span><span><b>I tuoi dati restano sul tuo iPhone.</b><br>Non vengono inviati a nessun server né online: sono salvati solo in questa app e protetti dal blocco e dalla cifratura dell\'iPhone.</span></div>'+
- '<h3>Categorie di scadenza</h3><div class="group">'+S.cats.map(function(c){return '<button class="row" data-act="editcat" data-id="'+esc(c.id)+'"><span class="ri">'+esc(c.icon)+'</span><span class="t"><b>'+esc(c.name)+'</b></span><span class="ch">›</span></button>'}).join('')+
- '<button class="row" data-act="addcat"><span class="ri" style="color:var(--ac)">＋</span><span class="t"><b style="color:var(--ac)">Nuova categoria</b></span></button></div>'+
- '<h3>Promemoria</h3><div class="group"><button class="row" data-act="ics"><span class="ri">📅</span><span class="t"><b>Aggiungi al Calendario</b><small>Scadenze aperte con avviso già impostato</small></span><span class="ch">›</span></button></div>'+
- '<p class="note">Si apre il foglio di condivisione: scegli Calendario (o salva il file e aprilo). Nella schermata di conferma scegli il calendario <b>“Sul mio iPhone”</b> se non vuoi che finisca su iCloud. Dopo aver modificato scadenze, riesporta.</p>'+
- '<h3>Copia di sicurezza</h3><div class="group"><button class="row" data-act="bkp"><span class="ri">⬆️</span><span class="t"><b>Esporta backup</b><small>File da salvare in File, solo sul tuo iPhone</small></span><span class="ch">›</span></button>'+
- '<button class="row" data-act="imp"><span class="ri">⬇️</span><span class="t"><b>Ripristina da backup</b><small>Sostituisce i dati attuali</small></span><span class="ch">›</span></button>'+
- '<button class="row red" data-act="wipe"><span class="ri">🗑️</span><span class="t"><b>Cancella tutti i dati</b></span></button></div>'+
- '<p class="note">Se elimini l\'app dalla Home o cancelli i dati di Safari, le scadenze vanno perse: fai ogni tanto un backup. Archiviazione protetta dal sistema: '+(persisted===true?'attiva ✓':persisted===false?'non garantita (usa l\'app dalla Home)':'verifica…')+(storageOk?'':' · ⚠️ salvataggio non disponibile')+'</p></div>';
+/* ---------- archivio file allegati (IndexedDB: solo su questo dispositivo) ---------- */
+var DBH=null;
+function idb(){return new Promise(function(res,rej){if(DBH)return res(DBH);var r=indexedDB.open('scadenze-files',1);r.onupgradeneeded=function(){r.result.createObjectStore('f')};r.onsuccess=function(){DBH=r.result;res(DBH)};r.onerror=function(){rej(r.error)}})}
+function tx(mode,fn){return idb().then(function(db){return new Promise(function(res,rej){var t=db.transaction('f',mode),out=fn(t.objectStore('f'));t.oncomplete=function(){res(out&&out.result)};t.onerror=function(){rej(t.error)};t.onabort=function(){rej(t.error)}})})}
+function fput(id,b){return tx('readwrite',function(s){return s.put(b,id)})}
+function fget(id){return tx('readonly',function(s){return s.get(id)})}
+function fdel(id){return tx('readwrite',function(s){return s.delete(id)})}
+function fclear(){return tx('readwrite',function(s){return s.clear()})}
+function getBlob(id){var e=V.sheet;if(e&&e.pend&&e.pend[id])return Promise.resolve(e.pend[id]);return fget(id)}
+function delFiles(x){return Promise.all((x.files||[]).map(function(f){return fdel(f.id).catch(function(){})}))}
+function toData(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=rej;r.readAsDataURL(b)})}
+function dataToBlob(d,m){var bin=atob(d.split(',')[1]),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:m})}
+function makeBackup(){var o=JSON.parse(JSON.stringify(S)),ids=[];o.blobs={};
+ S.docs.concat(S.items).forEach(function(x){(x.files||[]).forEach(function(f){ids.push(f.id)})});
+ return ids.reduce(function(p,id){return p.then(function(){return fget(id)}).then(function(b){if(!b)return;return toData(b).then(function(d){o.blobs[id]={mime:b.type,data:d}})})},Promise.resolve()).then(function(){return JSON.stringify(o)})}
+function shrink(file){return new Promise(function(res){
+ if(!/^image\/(jpeg|png|webp|heic|heif)/i.test(file.type)||file.size<400000){res(file);return}
+ var u=URL.createObjectURL(file),im=new Image();
+ im.onload=function(){var s=Math.min(1,2200/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);c.toBlob(function(b){URL.revokeObjectURL(u);res(b&&b.size<file.size?b:file)},'image/jpeg',.85)};
+ im.onerror=function(){URL.revokeObjectURL(u);res(file)};im.src=u})}
+function shareBlob(b,name,mime){var f=null;try{f=new File([b],name,{type:mime})}catch(e){}
+ var fb=function(){var u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},5000)};
+ if(f&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(e){if(!e||e.name!=='AbortError')fb()})}else fb()}
+
+/* ---------- scontrini e garanzie ---------- */
+function dtype(id){return S.dtypes.find(function(t){return t.id===id})}
+function fmtSize(n){return n<1024?n+' B':n<1048576?Math.round(n/1024)+' KB':(n/1048576).toFixed(1).replace('.',',')+' MB'}
+function docHTML(x){
+ var t=dtype(x.type)||{icon:'📎',name:'Documento'},b='';
+ if(x.warranty){var w=days(x.warranty),m=new Date(P(x.warranty)).toLocaleDateString('it-IT',{month:'short',year:'numeric',timeZone:'UTC'}).replace('.','');
+  b='<em class="badge '+(w<0?'b-later':w<=60?'b-week':'b-done')+'" style="margin-top:5px">'+(w<0?'Garanzia scaduta':'Garanzia fino a '+esc(m))+'</em>'}
+ return '<button class="item" style="--c:#30b455" data-act="editdoc" data-id="'+esc(x.id)+'"><span class="ic">'+esc(t.icon)+'</span><span class="meta"><b>'+esc(x.title)+'</b><small>'+esc(t.name)+(x.shop?' · '+esc(x.shop):'')+(x.files.length?' · 📎 '+x.files.length:'')+'</small>'+b+'</span><span class="due"><small style="margin:0">'+esc(fmt(x.date,true))+'</small></span></button>'}
+function docsList(){
+ var q=V.docq.trim().toLowerCase();
+ var l=S.docs.filter(function(x){if(V.dtf!=='all'&&x.type!==V.dtf)return false;if(!q)return true;var t=dtype(x.type);return(x.title+' '+x.shop+' '+x.desc+' '+(t?t.name:'')).toLowerCase().indexOf(q)>-1});
+ if(!l.length)return S.docs.length?'<div class="empty"><div class="e">🔍</div><b>Nessun risultato</b></div>':'<div class="empty"><div class="e">🧾</div><b>Nessun documento</b>Salva qui scontrini, garanzie e documenti fiscali, con foto o PDF.<button class="btn" data-act="newdoc">Aggiungi documento</button></div>';
+ l.sort(function(a,b){return b.date.localeCompare(a.date)});
+ var h='',yr='';
+ l.forEach(function(x){var y=x.date.slice(0,4);if(y!==yr){if(yr)h+='</div>';yr=y;h+='<h3>'+y+'</h3><div class="list">'}h+=docHTML(x)});
+ return h+'</div>'}
+function docsPage(){
+ var nf=0,gw=0,soon=0;
+ S.docs.forEach(function(x){nf+=x.files.length;if(x.warranty){var w=days(x.warranty);if(w>=0){gw++;if(w<=60)soon++}}});
+ var h='<div class="page"><p class="eyebrow">Documenti utili</p><div class="top"><h1 style="font-size:31px">Scontrini e garanzie</h1></div>'+
+ '<div class="hero" style="background:linear-gradient(135deg,#30b455,#0a9396);box-shadow:0 10px 30px rgba(48,180,85,.3)"><div class="big">'+S.docs.length+'</div><div class="lbl">'+(S.docs.length===1?'documento archiviato':'documenti archiviati')+'</div>'+
+ '<div class="stats"><div class="stat"><b>'+nf+'</b><span>Allegati</span></div><div class="stat"><b>'+gw+'</b><span>Garanzie</span></div><div class="stat"><b>'+soon+'</b><span>In scadenza</span></div></div></div>'+
+ '<input id="dsearch" class="search" type="search" placeholder="Cerca per nome, negozio, note…" value="'+esc(V.docq)+'" autocomplete="off" autocorrect="off">'+
+ '<div class="chips"><button class="chip'+(V.dtf==='all'?' on':'')+'" data-act="dtf" data-v="all">Tutti</button>'+S.dtypes.map(function(t){return '<button class="chip'+(V.dtf===t.id?' on':'')+'" data-act="dtf" data-v="'+esc(t.id)+'">'+esc(t.icon)+' '+esc(t.name)+'</button>'}).join('')+'</div>'+
+ '<div id="dlist">'+docsList()+'</div></div>';
  return h}
 
-var TABS=[['home','🔔','Scadenze'],['sections','👥','Sezioni'],['settings','⚙️','Impostazioni']];
+function settings(){
+ var h='<div class="page"><p class="eyebrow">Personalizza</p><div class="top"><h1>Impostazioni</h1></div>'+
+ '<div class="secure"><span class="e">🔒</span><span><b>I tuoi dati restano sul tuo iPhone.</b><br>Scadenze, foto e file non vengono inviati a nessun server né online: sono salvati solo in questa app e protetti dal blocco e dalla cifratura dell\'iPhone.</span></div>'+
+ '<h3>Categorie di scadenza</h3><div class="group">'+S.cats.map(function(c){return '<button class="row" data-act="editcat" data-id="'+esc(c.id)+'"><span class="ri">'+esc(c.icon)+'</span><span class="t"><b>'+esc(c.name)+'</b></span><span class="ch">›</span></button>'}).join('')+
+ '<button class="row" data-act="addcat"><span class="ri" style="color:var(--ac)">＋</span><span class="t"><b style="color:var(--ac)">Nuova categoria</b></span></button></div>'+
+ '<h3>Tipi di documento</h3><div class="group">'+S.dtypes.map(function(c){return '<button class="row" data-act="edittype" data-id="'+esc(c.id)+'"><span class="ri">'+esc(c.icon)+'</span><span class="t"><b>'+esc(c.name)+'</b></span><span class="ch">›</span></button>'}).join('')+
+ '<button class="row" data-act="addtype"><span class="ri" style="color:var(--ac)">＋</span><span class="t"><b style="color:var(--ac)">Nuovo tipo</b></span></button></div>'+
+ '<h3>Importa da Outlook</h3><div class="group"><button class="row" data-act="outlook"><span class="ri">📥</span><span class="t"><b>Importa eventi (.ics)</b><small>Titolo e ora di inizio, categoria “Generico”</small></span><span class="ch">›</span></button></div>'+
+ '<p class="note">In Outlook per computer: <b>Calendario → File → Salva calendario</b>, scegli l\'intervallo di date e salva il file .ics. Poi mettilo sull\'iPhone (AirDrop, mail a te stesso o iCloud Drive) e sceglilo qui. Il file viene letto solo sul telefono. Gli eventi già importati non vengono duplicati.</p>'+
+ '<h3>Promemoria</h3><div class="group"><button class="row" data-act="ics"><span class="ri">📅</span><span class="t"><b>Aggiungi al Calendario</b><small>Scadenze aperte con avviso già impostato</small></span><span class="ch">›</span></button></div>'+
+ '<p class="note">Si apre il foglio di condivisione: scegli Calendario (o salva il file e aprilo). Scegli il calendario <b>“Sul mio iPhone”</b> se non vuoi che finisca su iCloud. Le scadenze importate da Outlook non vengono riesportate (sono già nel tuo Outlook).</p>'+
+ '<h3>Copia di sicurezza</h3><div class="group"><button class="row" data-act="bkp"><span class="ri">⬆️</span><span class="t"><b>Esporta backup completo</b><small>Scadenze, documenti, foto e PDF in un file</small></span><span class="ch">›</span></button>'+
+ '<button class="row" data-act="imp"><span class="ri">⬇️</span><span class="t"><b>Ripristina da backup</b><small>Sostituisce i dati attuali</small></span><span class="ch">›</span></button>'+
+ '<button class="row red" data-act="wipe"><span class="ri">🗑️</span><span class="t"><b>Cancella tutti i dati</b></span></button></div>'+
+ '<p class="note">Se elimini l\'app dalla Home o cancelli i dati di Safari, tutto va perso: fai ogni tanto un backup e salvalo in File. Con molte foto il backup può essere grande.<br>Spazio usato: '+(V.usage==null?'…':fmtSize(V.usage))+' · Archiviazione protetta dal sistema: '+(persisted===true?'attiva ✓':persisted===false?'non garantita (usa l\'app dalla Home)':'verifica…')+(storageOk?'':' · ⚠️ salvataggio non disponibile')+'</p></div>';
+ return h}
+
+var TABS=[['home','🔔','Scadenze'],['sections','👥','Sezioni'],['docs','🧾','Scontrini'],['settings','⚙️','Impost.']];
 function render(keep){
- var y=window.scrollY,h=V.tab==='home'?home():V.tab==='sections'?(V.sec?secView():sections()):settings();
- $('#app').innerHTML=h+'<nav class="tabs"><div class="pill">'+TABS.map(function(t){return '<button data-act="tab" data-v="'+t[0]+'" class="'+(V.tab===t[0]?'on':'')+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</div><button class="plus" data-act="new" aria-label="Nuova scadenza">+</button></nav>';
+ var y=window.scrollY,h=V.tab==='home'?home():V.tab==='sections'?(V.sec?secView():sections()):V.tab==='docs'?docsPage():settings();
+ $('#app').innerHTML=h+'<nav class="tabs"><div class="pill">'+TABS.map(function(t){return '<button data-act="tab" data-v="'+t[0]+'" class="'+(V.tab===t[0]?'on':'')+'"><i>'+t[1]+'</i>'+t[2]+'</button>'}).join('')+'</div><button class="plus" data-act="new" aria-label="Nuovo">+</button></nav>';
  window.scrollTo(0,keep?y:0)}
 
 /* ---------- fogli (form) ---------- */
+function genCat(){if(!S.cats.some(function(c){return c.id==='c-gen'}))S.cats.push({id:'c-gen',name:'Generico',icon:'📌'});return'c-gen'}
 function newItem(){var first=S.sections.length===1?[S.sections[0].id]:[];if(V.sec)first=[V.sec];
- return{id:uid(),title:'',desc:'',cat:S.cats[0]?S.cats[0].id:'',created:today(),due:today(),rem:7,time:'09:00',secs:first,done:false}}
+ return{id:uid(),title:'',desc:'',cat:S.cats[0]?S.cats[0].id:'',created:today(),due:today(),start:'',rem:7,time:'09:00',secs:first,done:false,files:[]}}
+function newDoc(){return{id:uid(),title:'',type:S.dtypes[0]?S.dtypes[0].id:'',date:today(),shop:'',amount:'',warranty:'',desc:'',secs:V.sec?[V.sec]:[],files:[]}}
 function iconPick(list,cur){return '<div class="pick">'+list.map(function(e){return '<button data-act="icon" data-v="'+esc(e)+'" class="'+(e===cur?'on':'')+'">'+esc(e)+'</button>'}).join('')+'</div>'}
+function secTags(d,suffix){var h='';
+ [['persona','Famiglia'],['business','Business']].forEach(function(k){var ss=S.sections.filter(function(s){return s.kind===k[0]});if(!ss.length)return;
+  h+='<h3>'+k[1]+suffix+'</h3><div class="group"><div class="tg">'+ss.map(function(s){return '<button data-act="tog" data-id="'+esc(s.id)+'" style="--c:'+col(s.color)+'" class="'+(d.secs.indexOf(s.id)>-1?'on':'')+'">'+esc(s.icon)+' '+esc(s.name)+'</button>'}).join('')+'</div></div>'});
+ return h}
+function fileIcon(m){return/^image\//.test(m)?'🖼️':/pdf/.test(m)?'📕':'📄'}
+function attInner(d){return d.files.map(function(f){return '<div class="frow"><button class="fv" data-act="fview" data-id="'+esc(f.id)+'"><span class="th" data-th="'+esc(f.id)+'" data-m="'+esc(f.mime)+'">'+fileIcon(f.mime)+'</span><span class="t"><b>'+esc(f.name)+'</b><small>'+fmtSize(f.size||0)+'</small></span></button><button class="fx" data-act="frm" data-id="'+esc(f.id)+'" aria-label="Rimuovi">✕</button></div>'}).join('')+
+ '<div class="attbtns"><button data-act="addfile" data-v="cam">📷 Scatta foto</button><button data-act="addfile" data-v="file">📎 Allega file</button></div>'}
+function attHTML(d){return '<h3>Allegati · foto, PDF o altri file</h3><div class="group" id="att">'+attInner(d)+'</div>'}
+function hydrate(){document.querySelectorAll('[data-th]').forEach(function(el){if(el.dataset.done)return;el.dataset.done='1';if(!/^image\//.test(el.dataset.m))return;
+ getBlob(el.dataset.th).then(function(b){if(!b)return;var u=URL.createObjectURL(b);V.urls.push(u);el.style.backgroundImage='url('+u+')';el.textContent=''}).catch(function(){})})}
+
+function impStats(d){var t=today(),fresh=[],dup=0;
+ d.evs.forEach(function(x){if(d.fut&&x.date<t)return;if(S.items.some(function(i){return i.ext===x.key}))dup++;else fresh.push(x)});
+ fresh.sort(function(a,b){return a.date.localeCompare(b.date)||(a.start||'').localeCompare(b.start||'')});return{fresh:fresh,dup:dup}}
+function impBody(d){var st=impStats(d);
+ return '<div class="secure"><span class="e">📥</span><span><b>'+d.evs.length+' eventi</b> nel file. Vengono importati con titolo e ora di inizio, nella categoria “Generico”.</span></div>'+
+ '<h3>Dove importare</h3><div class="group"><label class="fld"><span>Sezione</span><select id="f-isec">'+S.sections.map(function(s){return '<option value="'+esc(s.id)+'"'+(s.id===d.sec?' selected':'')+'>'+esc(s.icon)+'  '+esc(s.name)+'</option>'}).join('')+'</select></label>'+
+ '<div class="tg"><button data-act="ifut" style="--c:#0a84ff" class="'+(d.fut?'on':'')+'">Solo da oggi in poi</button></div></div>'+
+ '<h3>Anteprima · '+st.fresh.length+' da importare'+(st.dup?' · '+st.dup+' già presenti':'')+'</h3>'+
+ (st.fresh.length?'<div class="list">'+st.fresh.slice(0,40).map(function(x){return '<div class="item" style="--c:#8e8e93"><span class="ic">🗓️</span><span class="meta"><b>'+esc(x.title)+'</b><small>'+esc(fmt(x.date))+(x.start?' · '+esc(x.start):' · tutto il giorno')+'</small></span></div>'}).join('')+'</div>'+(st.fresh.length>40?'<p class="note">…e altri '+(st.fresh.length-40)+'</p>':''):'<div class="empty">Nessun evento nuovo da importare</div>')}
+
 function sheetHTML(){
- var e=V.sheet,d=e.d,body='',title='';
+ var e=V.sheet,d=e.d,body='',title='',sv='Salva';
  if(e.type==='item'){
   title=e.isNew?'Nuova scadenza':'Scadenza';
   body='<div class="group"><label class="fld"><span>Titolo</span><input id="f-title" class="title-in" value="'+esc(d.title)+'" placeholder="Es. Assicurazione auto" autocomplete="off"></label>'+
@@ -275,15 +378,28 @@ function sheetHTML(){
   '<label class="fld"><span>Categoria</span><select id="f-cat">'+S.cats.map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===d.cat?' selected':'')+'>'+esc(c.icon)+'  '+esc(c.name)+'</option>'}).join('')+'</select></label></div>'+
   '<h3>Date</h3><div class="group"><label class="fld"><span>Data di creazione</span><input type="date" id="f-created" value="'+esc(d.created)+'"></label>'+
   '<label class="fld"><span>Data di scadenza</span><input type="date" id="f-due" value="'+esc(d.due)+'"></label>'+
+  '<label class="fld"><span>Ora di inizio (facoltativa)</span><input type="time" id="f-start" value="'+esc(d.start||'')+'"><button class="clr" data-act="clrstart">Rimuovi</button></label>'+
   '<label class="fld"><span>Promemoria</span><select id="f-rem">'+REM.map(function(r){return '<option value="'+r[0]+'"'+(Number(d.rem)===r[0]?' selected':'')+'>'+r[1]+'</option>'}).join('')+'</select></label>'+
-  '<label class="fld"><span>Ora del promemoria</span><input type="time" id="f-time" value="'+esc(d.time)+'"></label></div>';
-  [['persona','Famiglia'],['business','Business']].forEach(function(k){var ss=S.sections.filter(function(s){return s.kind===k[0]});if(!ss.length)return;
-   body+='<h3>'+k[1]+' · a chi riguarda</h3><div class="group"><div class="tg">'+ss.map(function(s){return '<button data-act="tog" data-id="'+esc(s.id)+'" style="--c:'+col(s.color)+'" class="'+(d.secs.indexOf(s.id)>-1?'on':'')+'">'+esc(s.icon)+' '+esc(s.name)+'</button>'}).join('')+'</div></div>'});
+  '<label class="fld"><span>Ora del promemoria (se non c\'è un\'ora di inizio)</span><input type="time" id="f-time" value="'+esc(d.time)+'"></label></div>'+
+  secTags(d,' · a chi riguarda')+attHTML(d);
   if(!e.isNew)body+='<button class="btn sec" data-act="done">'+(d.done?'↩︎ Riapri scadenza':'✓ Segna come fatta')+'</button><button class="btn sec" data-act="one">📅 Aggiungi al Calendario</button><button class="btn red" data-act="del">Elimina scadenza</button>';
- }else if(e.type==='cat'){
-  title=e.isNew?'Nuova categoria':'Categoria';
+ }else if(e.type==='doc'){
+  title=e.isNew?'Nuovo documento':'Documento';
+  body='<div class="group"><label class="fld"><span>Titolo</span><input id="f-title" class="title-in" value="'+esc(d.title)+'" placeholder="Es. Lavatrice Samsung" autocomplete="off"></label>'+
+  '<label class="fld"><span>Tipo</span><select id="f-type">'+S.dtypes.map(function(t){return '<option value="'+esc(t.id)+'"'+(t.id===d.type?' selected':'')+'>'+esc(t.icon)+'  '+esc(t.name)+'</option>'}).join('')+'</select></label>'+
+  '<label class="fld"><span>Data del documento</span><input type="date" id="f-date" value="'+esc(d.date)+'"></label>'+
+  '<label class="fld"><span>Negozio / emittente</span><input id="f-shop" value="'+esc(d.shop)+'" placeholder="Es. MediaWorld, Agenzia Entrate" autocomplete="off"></label>'+
+  '<label class="fld"><span>Importo (€)</span><input id="f-amount" inputmode="decimal" value="'+esc(d.amount)+'" placeholder="Facoltativo" autocomplete="off"></label>'+
+  '<label class="fld"><span>Garanzia fino al</span><input type="date" id="f-war" value="'+esc(d.warranty||'')+'"><button class="clr" data-act="clrwar">Rimuovi</button></label>'+
+  '<label class="fld"><span>Note</span><textarea id="f-desc" rows="3" placeholder="N° seriale, riferimenti, a cosa serve…">'+esc(d.desc)+'</textarea></label></div>'+
+  attHTML(d)+secTags(d,' · a chi riguarda (facoltativo)');
+  if(!e.isNew)body+='<button class="btn sec" data-act="mkdl">📅 Crea scadenza per fine garanzia</button><button class="btn red" data-act="del">Elimina documento</button>';
+ }else if(e.type==='cat'||e.type==='dtype'){
+  title=e.type==='cat'?(e.isNew?'Nuova categoria':'Categoria'):(e.isNew?'Nuovo tipo':'Tipo di documento');
   body='<div class="group"><label class="fld"><span>Nome</span><input id="f-name" class="title-in" value="'+esc(d.name)+'" placeholder="Es. Assicurazioni" autocomplete="off"></label></div><h3>Icona</h3><div class="group">'+iconPick(CAT_ICONS,d.icon)+'</div>'+
-  (e.isNew?'':'<button class="btn red" data-act="del">Elimina categoria</button>');
+  (e.isNew?'':'<button class="btn red" data-act="del">Elimina</button>');
+ }else if(e.type==='imp'){
+  title='Importa da Outlook';sv='Importa';body=impBody(d);
  }else{
   title=e.isNew?'Nuova sezione':'Sezione';
   body='<div class="group"><label class="fld"><span>Nome</span><input id="f-name" class="title-in" value="'+esc(d.name)+'" placeholder="Es. Marco, Giulia, Nome azienda" autocomplete="off"></label>'+
@@ -291,24 +407,36 @@ function sheetHTML(){
   '<h3>Icona</h3><div class="group">'+iconPick(SEC_ICONS,d.icon)+'</div><h3>Colore</h3><div class="group"><div class="pick">'+COLORS.map(function(c){return '<button class="swatch'+(c===d.color?' on':'')+'" style="--c:'+c+'" data-act="color" data-v="'+c+'"></button>'}).join('')+'</div></div>'+
   (e.isNew?'':'<button class="btn red" data-act="del">Elimina sezione</button>');
  }
- return '<div class="backdrop" data-act="close"></div><div class="sheet"><div class="sh-head"><button data-act="close">Annulla</button><b>'+title+'</b><button class="sv" data-act="save">Salva</button></div><div class="sh-body">'+body+'</div></div>'}
-function openSheet(type,isNew,d){V.sheet={type:type,isNew:isNew,d:d};$('#sheetRoot').innerHTML=sheetHTML();document.body.classList.add('lock');
- if(isNew){var i=$('#f-title')||$('#f-name');if(i&&type!=='item')setTimeout(function(){i.focus()},330)}}
-function closeSheet(){V.sheet=null;$('#sheetRoot').innerHTML='';document.body.classList.remove('lock')}
+ return '<div class="backdrop" data-act="close"></div><div class="sheet"><div class="sh-head"><button data-act="close">Annulla</button><b>'+title+'</b><button class="sv" data-act="save">'+sv+'</button></div><div class="sh-body">'+body+'</div></div>'}
+function openSheet(type,isNew,d){V.sheet={type:type,isNew:isNew,d:d,pend:{},rm:[]};$('#sheetRoot').innerHTML=sheetHTML();document.body.classList.add('lock');hydrate();
+ if(isNew&&(type==='sec'||type==='cat'||type==='dtype')){var i=$('#f-name');if(i)setTimeout(function(){i.focus()},330)}}
+function closeViewer(){var v=$('#viewer');v.style.display='none';v.innerHTML=''}
+function closeSheet(){closeViewer();V.sheet=null;$('#sheetRoot').innerHTML='';document.body.classList.remove('lock');V.urls.forEach(function(u){URL.revokeObjectURL(u)});V.urls=[]}
 function collect(){var e=V.sheet,d=e.d,g=function(i){var x=$(i);return x?x.value:null};
- if(e.type==='item'){d.title=(g('#f-title')||'').trim();d.desc=g('#f-desc')||'';d.cat=g('#f-cat')||d.cat;d.created=g('#f-created')||today();d.due=g('#f-due')||today();d.rem=parseInt(g('#f-rem'),10)||0;d.time=g('#f-time')||'09:00'}
+ if(e.type==='item'){d.title=(g('#f-title')||'').trim();d.desc=g('#f-desc')||'';d.cat=g('#f-cat')||d.cat;d.created=g('#f-created')||today();d.due=g('#f-due')||today();d.start=g('#f-start')||'';d.rem=parseInt(g('#f-rem'),10)||0;d.time=g('#f-time')||'09:00'}
+ else if(e.type==='doc'){d.title=(g('#f-title')||'').trim();d.type=g('#f-type')||d.type;d.date=g('#f-date')||today();d.shop=(g('#f-shop')||'').trim();d.amount=(g('#f-amount')||'').trim();d.warranty=g('#f-war')||'';d.desc=g('#f-desc')||''}
+ else if(e.type==='imp'){var s=g('#f-isec');if(s)d.sec=s}
  else{d.name=(g('#f-name')||'').trim();if(e.type==='sec')d.kind=g('#f-kind')||d.kind}}
 
 /* ---------- calendario (.ics) e backup ---------- */
 function ie(t){return String(t||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n')}
 function ev(it){
- var c=cat(it.cat)||{name:''},nm=secsOf(it).map(function(s){return s.name}).join(', ');
- var nx=new Date(P(it.due)+864e5),n=nx.getUTCFullYear()+pad(nx.getUTCMonth()+1)+pad(nx.getUTCDate());
- var tp=(it.time||'09:00').split(':'),tot=(parseInt(it.rem,10)||0)*1440-(parseInt(tp[0],10)*60+parseInt(tp[1],10));
- var tr=tot>0?'-PT'+tot+'M':'PT'+(-tot)+'M';
- return['BEGIN:VEVENT','UID:'+it.id+'@scadenze.local','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART;VALUE=DATE:'+it.due.replace(/-/g,''),'DTEND;VALUE=DATE:'+n,
- 'SUMMARY:'+ie('⏰ '+it.title+(nm?' ('+nm+')':'')),'DESCRIPTION:'+ie((c.name?c.name+'\n':'')+(it.desc?it.desc+'\n':'')+'Creata il '+fmt(it.created)),
- 'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+ie(it.title),'TRIGGER;RELATED=START:'+tr,'END:VALARM','END:VEVENT'].join('\r\n')}
+ var c=cat(it.cat)||{name:''},nm=secsOf(it).map(function(s){return s.name}).join(', '),r=parseInt(it.rem,10)||0;
+ var stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+ var o=['BEGIN:VEVENT','UID:'+it.id+'@scadenze.local','DTSTAMP:'+stamp],tr;
+ var f=function(ms){var q=new Date(ms);return q.getUTCFullYear()+pad(q.getUTCMonth()+1)+pad(q.getUTCDate())+'T'+pad(q.getUTCHours())+pad(q.getUTCMinutes())+'00'};
+ if(it.start){
+  var sp=it.start.split(':'),sm=parseInt(sp[0],10)*60+parseInt(sp[1],10);
+  o.push('DTSTART:'+f(P(it.due)+sm*6e4),'DTEND:'+f(P(it.due)+(sm+60)*6e4));
+  tr=r>0?'-PT'+(r*1440)+'M':'PT0M';
+ }else{
+  var n=new Date(P(it.due)+864e5),tp=(it.time||'09:00').split(':'),tot=r*1440-(parseInt(tp[0],10)*60+parseInt(tp[1],10));
+  o.push('DTSTART;VALUE=DATE:'+it.due.replace(/-/g,''),'DTEND;VALUE=DATE:'+n.getUTCFullYear()+pad(n.getUTCMonth()+1)+pad(n.getUTCDate()));
+  tr=tot>0?'-PT'+tot+'M':'PT'+(-tot)+'M';
+ }
+ o.push('SUMMARY:'+ie('⏰ '+it.title+(nm?' ('+nm+')':'')),'DESCRIPTION:'+ie((c.name?c.name+'\n':'')+(it.desc?it.desc+'\n':'')+'Creata il '+fmt(it.created)),
+  'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+ie(it.title),'TRIGGER;RELATED=START:'+tr,'END:VALARM','END:VEVENT');
+ return o.join('\r\n')}
 function ics(l){return'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Scadenze//IT\r\nCALSCALE:GREGORIAN\r\nX-WR-CALNAME:Scadenze\r\n'+l.map(ev).join('\r\n')+'\r\nEND:VCALENDAR\r\n'}
 function giveFile(name,type,text){
  var file;try{file=new File([text],name,{type:type})}catch(e){file=null}
@@ -316,13 +444,116 @@ function giveFile(name,type,text){
  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file]}).catch(function(e){if(e&&e.name!=='AbortError')fb()})}else fb()}
 function exportIcs(l,n){if(!l.length){toast('Nessuna scadenza da esportare');return}giveFile(n,'text/calendar',ics(l))}
 
+/* ---------- import da Outlook (file .ics letto solo sul telefono) ---------- */
+function unesc(s){return String(s).replace(/\\[nN]/g,' ').replace(/\\([,;\\])/g,'$1')}
+function dtp(v,p){var m=/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/.exec(String(v).trim());if(!m)return null;
+ if(m[4]===undefined)return{date:m[1]+'-'+m[2]+'-'+m[3],time:''};
+ if(m[7]){var d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0)));return{date:d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),time:pad(d.getHours())+':'+pad(d.getMinutes())}}
+ return{date:m[1]+'-'+m[2]+'-'+m[3],time:m[4]+':'+m[5]}}
+function isoOf(ms){return new Date(ms).toISOString().slice(0,10)}
+function dowM(ms){return(new Date(ms).getUTCDay()+6)%7}
+var DOWS={MO:0,TU:1,WE:2,TH:3,FR:4,SA:5,SU:6};
+function expand(sd,r,hz){
+ var o=[],start=P(sd),iv=parseInt(r.INTERVAL||'1',10)||1,cnt=parseInt(r.COUNT||'0',10),un=Infinity,n=0,g=0;
+ if(r.UNTIL){var u=dtp(r.UNTIL,{});if(u)un=P(u.date)}
+ var lim=Math.min(un,hz);
+ function add(ms){if(ms>lim)return false;n++;o.push(isoOf(ms));return!(cnt&&n>=cnt)}
+ var fr=(r.FREQ||'').toUpperCase(),by=r.BYDAY?r.BYDAY.split(','):[];
+ if(fr==='DAILY'){for(var ms=start;g++<20000;ms+=iv*864e5){if(!add(ms))break}}
+ else if(fr==='WEEKLY'){
+  var dl=by.map(function(x){return DOWS[x.replace(/[^A-Z]/g,'')]}).filter(function(x){return x!==undefined}).sort();if(!dl.length)dl=[dowM(start)];
+  var ws=start-dowM(start)*864e5,stop=false;
+  for(var w=0;g++<5000&&!stop;w+=iv){if(ws+w*7*864e5>lim)break;
+   for(var k=0;k<dl.length;k++){var m2=ws+(w*7+dl[k])*864e5;if(m2<start)continue;if(!add(m2)){stop=true;break}}}
+ }else if(fr==='MONTHLY'){
+  var sdt=new Date(start),sy=sdt.getUTCFullYear(),sm=sdt.getUTCMonth(),sday=sdt.getUTCDate(),bd=parseInt(r.BYMONTHDAY||'0',10)||sday,om=null;
+  if(by.length){var mm=/^(-?\d)?([A-Z]{2})$/.exec(by[0]);if(mm&&mm[1]&&DOWS[mm[2]]!==undefined)om={ord:parseInt(mm[1],10),dow:DOWS[mm[2]]}}
+  for(var q=0;g++<2000;q+=iv){var yy=sy+Math.floor((sm+q)/12),mo=(sm+q)%12,dim=new Date(Date.UTC(yy,mo+1,0)).getUTCDate(),day;
+   if(om){if(om.ord>0){var f1=Date.UTC(yy,mo,1);day=1+((om.dow-dowM(f1)+7)%7)+(om.ord-1)*7}else{var l1=Date.UTC(yy,mo,dim);day=dim-((dowM(l1)-om.dow+7)%7)+(om.ord+1)*7}}
+   else day=bd;
+   if(day<1||day>dim)continue;var m3=Date.UTC(yy,mo,day);if(m3<start)continue;if(m3>lim)break;if(!add(m3))break}
+ }else if(fr==='YEARLY'){
+  var s2=new Date(start);for(var y=0;g++<500;y+=iv){var m4=Date.UTC(s2.getUTCFullYear()+y,s2.getUTCMonth(),s2.getUTCDate());if(m4>lim)break;if(!add(m4))break}
+ }else o.push(sd);
+ return o}
+function parseICS(txt){
+ var lines=String(txt).replace(/\r\n?/g,'\n').replace(/\n[ \t]/g,'').split('\n'),evs=[],cur=null,alarm=false;
+ lines.forEach(function(l){
+  if(l==='BEGIN:VEVENT'){cur={ex:[]};alarm=false;return}
+  if(l==='END:VEVENT'){if(cur)evs.push(cur);cur=null;return}
+  if(!cur)return;
+  if(l==='BEGIN:VALARM'){alarm=true;return}
+  if(l==='END:VALARM'){alarm=false;return}
+  if(alarm)return;
+  var i=l.indexOf(':');if(i<0)return;
+  var parts=l.slice(0,i).split(';'),name=parts[0].toUpperCase(),val=l.slice(i+1),par={};
+  parts.slice(1).forEach(function(p){var kv=p.split('=');par[kv[0].toUpperCase()]=(kv[1]||'').replace(/"/g,'')});
+  if(name==='EXDATE'){val.split(',').forEach(function(x){var q=dtp(x,par);if(q)cur.ex.push(q.date)})}
+  else cur[name]={v:val,p:par}});
+ var out=[],hz=P(today())+400*864e5,over={};
+ evs.forEach(function(e){if(e['RECURRENCE-ID']&&e.UID){var r=dtp(e['RECURRENCE-ID'].v,e['RECURRENCE-ID'].p);if(r)over[e.UID.v+'|'+r.date]=1}});
+ evs.forEach(function(e){
+  if(!e.DTSTART)return;if(e.STATUS&&/CANCELLED/i.test(e.STATUS.v))return;
+  var s=dtp(e.DTSTART.v,e.DTSTART.p);if(!s)return;
+  var title=unesc((e.SUMMARY&&e.SUMMARY.v)||'').trim()||'(senza titolo)',u=(e.UID&&e.UID.v)||(title+s.date),rec=e.RRULE&&!e['RECURRENCE-ID'],dates=[s.date];
+  if(rec){var rr={};e.RRULE.v.split(';').forEach(function(x){var kv=x.split('=');rr[kv[0].toUpperCase()]=kv[1]});dates=expand(s.date,rr,hz)}
+  dates.forEach(function(d){if(e.ex.indexOf(d)>-1)return;if(rec&&over[u+'|'+d])return;out.push({title:title,date:d,start:s.time,key:'ol:'+u+'|'+d})})});
+ return out}
+
 /* ---------- eventi ---------- */
+function openViewer(id){
+ var e=V.sheet,f=e&&e.d.files.find(function(x){return x.id===id});if(!f)return;
+ getBlob(id).then(function(b){
+  if(!b){toast('Allegato non trovato');return}
+  var mime=f.mime||b.type;
+  if(!/^image\//.test(mime)&&!/pdf/.test(mime)){shareBlob(b,f.name,mime);return}
+  var u=URL.createObjectURL(b);V.urls.push(u);V.view={b:b,name:f.name,mime:mime};
+  var body=/^image\//.test(mime)?'<img src="'+u+'" alt="">':'<iframe src="'+u+'" title="PDF"></iframe>';
+  var v=$('#viewer');v.innerHTML='<div class="vbar"><button data-act="vclose">Chiudi</button><b>'+esc(f.name)+'</b><button data-act="vshare">Condividi</button></div><div class="vbody">'+body+'</div>';v.style.display='flex'
+ }).catch(function(){toast('Impossibile aprire l\'allegato')})}
+function addFiles(fs){var e=V.sheet;if(!e||!e.d.files)return Promise.resolve();
+ return fs.reduce(function(p,f){return p.then(function(){return shrink(f)}).then(function(b){
+  var mime=b.type||f.type||'application/octet-stream',name=f.name||'allegato',id=uid();
+  if(b!==f&&/jpeg/.test(mime))name=name.replace(/\.[^.]+$/,'')+'.jpg';
+  e.pend[id]=b;e.d.files.push({id:id,name:name,mime:mime,size:b.size})})},Promise.resolve()).then(function(){var a=$('#att');if(a){a.innerHTML=attInner(e.d);hydrate()}})}
+function commitFiles(e){var keep={},d=e.d;d.files.forEach(function(f){keep[f.id]=1});
+ var puts=Object.keys(e.pend).filter(function(id){return keep[id]}).map(function(id){return fput(id,e.pend[id])});
+ return Promise.all(puts).then(function(){return Promise.all(e.rm.map(function(id){return fdel(id).catch(function(){})}))})}
+function upsert(L,d){var k=L.findIndex(function(x){return x.id===d.id});if(k>-1)L[k]=d;else L.push(d)}
+function doSave(){
+ var e=V.sheet;collect();var d=e.d;
+ if(e.type==='item'||e.type==='doc'){
+  if(!d.title){toast('Inserisci un titolo');return}
+  if(e.type==='item'){
+   if(!d.secs.length){toast('Scegli almeno una sezione');return}
+   if(d.due<d.created){toast('La scadenza è prima della creazione');return}}
+  commitFiles(e).then(function(){upsert(e.type==='item'?S.items:S.docs,d);save();closeSheet();render(true)}).catch(function(){toast('Impossibile salvare gli allegati: spazio insufficiente?')});
+  return}
+ if(e.type==='imp'){
+  var st=impStats(d),g=genCat();
+  st.fresh.forEach(function(x){S.items.push({id:uid(),title:x.title,desc:'',cat:g,created:today(),due:x.date,start:x.start,rem:0,time:'09:00',secs:[d.sec],done:false,files:[],ext:x.key,src:'outlook'})});
+  save();closeSheet();render(true);toast(st.fresh.length+' scadenze importate');return}
+ if(!d.name){toast('Inserisci un nome');return}
+ upsert(e.type==='cat'?S.cats:e.type==='dtype'?S.dtypes:S.sections,d);save();closeSheet();render(true)}
+function doDelete(){
+ var e=V.sheet,d=e.d,stored=(e.type==='item'?S.items:e.type==='doc'?S.docs:[]).find(function(x){return x.id===d.id});
+ var p=stored?delFiles(stored):Promise.resolve();
+ p.then(function(){
+  if(e.type==='item')S.items=S.items.filter(function(x){return x.id!==d.id});
+  else if(e.type==='doc')S.docs=S.docs.filter(function(x){return x.id!==d.id});
+  else if(e.type==='cat'){S.cats=S.cats.filter(function(c){return c.id!==d.id});S.items.forEach(function(x){if(x.cat===d.id)x.cat=S.cats[0]?S.cats[0].id:''})}
+  else if(e.type==='dtype'){S.dtypes=S.dtypes.filter(function(c){return c.id!==d.id});S.docs.forEach(function(x){if(x.type===d.id)x.type=S.dtypes[0]?S.dtypes[0].id:''})}
+  else{S.sections=S.sections.filter(function(s){return s.id!==d.id});S.items.forEach(function(x){x.secs=x.secs.filter(function(q){return q!==d.id})});S.items=S.items.filter(function(x){return x.secs.length});V.sec=null}
+  save();closeSheet();render()})}
 document.addEventListener('click',function(ev){
  var t=ev.target.closest('[data-act]');if(!t)return;var a=t.dataset.act,v=t.dataset.v,id=t.dataset.id,e=V.sheet;
- if(a==='tab'){V.tab=v;V.sec=null;V.catf='all';render()}
+ if(a==='tab'){V.tab=v;V.sec=null;V.catf='all';render();if(v==='settings')refreshUsage()}
  else if(a==='kind'){V.kind=v;render(true)}
- else if(a==='new'){openSheet('item',true,newItem())}
+ else if(a==='new'){if(V.tab==='docs')openSheet('doc',true,newDoc());else openSheet('item',true,newItem())}
+ else if(a==='newdoc'){openSheet('doc',true,newDoc())}
  else if(a==='edit'){var it=S.items.find(function(i){return i.id===id});if(it)openSheet('item',false,JSON.parse(JSON.stringify(it)))}
+ else if(a==='editdoc'){var dx=S.docs.find(function(i){return i.id===id});if(dx)openSheet('doc',false,JSON.parse(JSON.stringify(dx)))}
+ else if(a==='dtf'){V.dtf=v;render(true)}
  else if(a==='sec'){V.sec=id;V.catf='all';render()}
  else if(a==='back'){V.sec=null;render()}
  else if(a==='catf'){V.catf=v;render(true)}
@@ -331,44 +562,51 @@ document.addEventListener('click',function(ev){
  else if(a==='editsec'){openSheet('sec',false,JSON.parse(JSON.stringify(sec(id))))}
  else if(a==='addcat'){openSheet('cat',true,{id:uid(),name:'',icon:'📌'})}
  else if(a==='editcat'){openSheet('cat',false,JSON.parse(JSON.stringify(cat(id))))}
+ else if(a==='addtype'){openSheet('dtype',true,{id:uid(),name:'',icon:'📎'})}
+ else if(a==='edittype'){openSheet('dtype',false,JSON.parse(JSON.stringify(dtype(id))))}
  else if(a==='close'){closeSheet()}
  else if(a==='icon'){e.d.icon=v;t.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b===t)})}
  else if(a==='color'){e.d.color=v;t.parentNode.querySelectorAll('button').forEach(function(b){b.classList.toggle('on',b===t)})}
  else if(a==='tog'){var i=e.d.secs.indexOf(id);if(i>-1)e.d.secs.splice(i,1);else e.d.secs.push(id);t.classList.toggle('on')}
- else if(a==='save'){
-  collect();var d=e.d;
-  if(e.type==='item'){
-   if(!d.title){toast('Inserisci un titolo');return}
-   if(!d.secs.length){toast('Scegli almeno una sezione');return}
-   if(d.due<d.created){toast('La scadenza è prima della creazione');return}
-   var k=S.items.findIndex(function(x){return x.id===d.id});if(k>-1)S.items[k]=d;else S.items.push(d);
-  }else{
-   if(!d.name){toast('Inserisci un nome');return}
-   var L=e.type==='cat'?S.cats:S.sections,k2=L.findIndex(function(x){return x.id===d.id});if(k2>-1)L[k2]=d;else L.push(d)}
-  save();closeSheet();render(true);
- }
- else if(a==='del'){
-  if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tocca ancora per confermare';return}
-  var d2=e.d;
-  if(e.type==='item')S.items=S.items.filter(function(x){return x.id!==d2.id});
-  else if(e.type==='cat'){S.cats=S.cats.filter(function(c){return c.id!==d2.id});S.items.forEach(function(x){if(x.cat===d2.id)x.cat=S.cats[0]?S.cats[0].id:''})}
-  else{S.sections=S.sections.filter(function(s){return s.id!==d2.id});S.items.forEach(function(x){x.secs=x.secs.filter(function(q){return q!==d2.id})});S.items=S.items.filter(function(x){return x.secs.length});V.sec=null}
-  save();closeSheet();render();
- }
- else if(a==='done'){collect();e.d.done=!e.d.done;var k3=S.items.findIndex(function(x){return x.id===e.d.id});S.items[k3]=e.d;save();closeSheet();render(true)}
+ else if(a==='clrstart'){var s1=$('#f-start');if(s1)s1.value='';e.d.start=''}
+ else if(a==='clrwar'){var s2=$('#f-war');if(s2)s2.value='';e.d.warranty=''}
+ else if(a==='addfile'){$(v==='cam'?'#fcam':'#ffile').click()}
+ else if(a==='fview'){openViewer(id)}
+ else if(a==='frm'){var ix=e.d.files.findIndex(function(f){return f.id===id});if(ix>-1){e.d.files.splice(ix,1);if(e.pend[id])delete e.pend[id];else e.rm.push(id);$('#att').innerHTML=attInner(e.d);hydrate()}}
+ else if(a==='vclose'){closeViewer()}
+ else if(a==='vshare'){if(V.view)shareBlob(V.view.b,V.view.name,V.view.mime)}
+ else if(a==='ifut'){collect();e.d.fut=!e.d.fut;$('#sheetRoot').innerHTML=sheetHTML()}
+ else if(a==='save'){doSave()}
+ else if(a==='del'){if(!t.dataset.sure){t.dataset.sure='1';t.textContent='Tocca ancora per confermare';return}doDelete()}
+ else if(a==='done'){collect();e.d.done=!e.d.done;upsert(S.items,e.d);save();closeSheet();render(true)}
+ else if(a==='mkdl'){collect();var d=e.d;if(!d.warranty){toast('Imposta prima la fine garanzia');return}
+  var ss=d.secs.length?d.secs.slice():(S.sections[0]?[S.sections[0].id]:[]);
+  S.items.push({id:uid(),title:'Fine garanzia: '+(d.title||'documento'),desc:(d.shop?d.shop+' · ':'')+'Da Scontrini e garanzie',cat:genCat(),created:today(),due:d.warranty,start:'',rem:30,time:'09:00',secs:ss,done:false,files:[]});save();toast('Scadenza creata')}
  else if(a==='one'){collect();exportIcs([e.d],'scadenza.ics')}
- else if(a==='ics'){exportIcs(S.items.filter(function(x){return!x.done}),'scadenze.ics')}
- else if(a==='bkp'){giveFile('scadenze-backup-'+today()+'.json','application/json',JSON.stringify(S,null,1))}
+ else if(a==='ics'){exportIcs(S.items.filter(function(x){return!x.done&&x.src!=='outlook'}),'scadenze.ics')}
+ else if(a==='outlook'){$('#impics').click()}
+ else if(a==='bkp'){toast('Preparo il backup…');makeBackup().then(function(txt){giveFile('scadenze-backup-'+today()+'.json','application/json',txt)}).catch(function(){toast('Backup non riuscito (file troppo grandi?)')})}
  else if(a==='imp'){$('#imp').click()}
  else if(a==='wipe'){
   if(!t.dataset.sure){t.dataset.sure='1';t.querySelector('b').textContent='Tocca ancora per cancellare tutto';return}
-  S=defaults();save();V.sec=null;render();toast('Dati cancellati')}
+  fclear().catch(function(){}).then(function(){S=defaults();save();V.sec=null;render();toast('Dati cancellati')})}
 });
-$('#imp').addEventListener('change',function(){
- var f=this.files&&this.files[0];if(!f)return;var r=new FileReader();
- r.onload=function(){try{var o=JSON.parse(r.result);if(!valid(o))throw 0;S=o;save();V.sec=null;render();toast('Backup ripristinato')}catch(e){toast('File di backup non valido')}};
- r.readAsText(f);this.value=''});
-render();
+document.addEventListener('input',function(ev){if(ev.target.id==='dsearch'){V.docq=ev.target.value;var l=$('#dlist');if(l)l.innerHTML=docsList()}});
+function pickInput(sel,fn){$(sel).addEventListener('change',function(){var inp=this,fs=Array.prototype.slice.call(inp.files||[]);inp.value='';if(fs.length)fn(fs)})}
+pickInput('#fcam',addFiles);pickInput('#ffile',addFiles);
+pickInput('#impics',function(fs){var r=new FileReader();r.onload=function(){
+ var evs=[];try{evs=parseICS(r.result)}catch(x){}
+ if(!evs.length){toast('Nessun evento trovato nel file');return}
+ var bs=S.sections.find(function(s){return s.kind==='business'})||S.sections[0];
+ if(!bs){toast('Crea prima una sezione');return}
+ openSheet('imp',true,{evs:evs,sec:bs.id,fut:true})};r.readAsText(fs[0])});
+pickInput('#imp',function(fs){var r=new FileReader();r.onload=function(){
+ var o;try{o=JSON.parse(r.result);if(!valid(o))throw 0}catch(x){toast('File di backup non valido');return}
+ var bl=o.blobs||{};delete o.blobs;
+ fclear().then(function(){return Object.keys(bl).reduce(function(p,id){return p.then(function(){return fput(id,dataToBlob(bl[id].data,bl[id].mime))})},Promise.resolve())})
+ .then(function(){S=fix(o);save();V.sec=null;render();toast('Backup ripristinato')}).catch(function(){toast('Ripristino non riuscito')})};r.readAsText(fs[0])});
+function refreshUsage(){try{if(navigator.storage&&navigator.storage.estimate)navigator.storage.estimate().then(function(q){V.usage=q.usage;if(V.tab==='settings'&&!V.sheet)render(true)})}catch(e){}}
+render();refreshUsage();
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
 })();
 </script>
